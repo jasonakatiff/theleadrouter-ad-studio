@@ -35,7 +35,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "lucide-react": "^0.554.0",
-    "multer": "^2.0.2",
+    "multer": "^2.3.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-router-dom": "^7.9.6",
