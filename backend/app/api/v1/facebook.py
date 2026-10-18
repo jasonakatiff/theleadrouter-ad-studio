@@ -215,7 +215,7 @@ def disconnect_meta_connection(
 def get_ad_accounts(
     refresh: bool = False,
     service: FacebookService = Depends(get_facebook_service),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("campaigns:read"))
 ):
     try:
         return service.get_ad_accounts(force_refresh=refresh)
@@ -228,7 +228,7 @@ def get_ad_accounts(
 def read_campaigns(
     ad_account_id: Optional[str] = None,
     service: FacebookService = Depends(get_facebook_service),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("campaigns:read"))
 ):
     try:
         campaigns = service.get_campaigns(ad_account_id)
@@ -263,7 +263,7 @@ def create_campaign(
 def read_pixels(
     ad_account_id: Optional[str] = None,
     service: FacebookService = Depends(get_facebook_service),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("campaigns:read"))
 ):
     try:
         pixels = service.get_pixels(ad_account_id)
@@ -278,7 +278,7 @@ def read_pixels(
 def read_pages(
     ad_account_id: Optional[str] = None,
     service: FacebookService = Depends(get_facebook_service),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("campaigns:read"))
 ):
     try:
         pages = service.get_pages(ad_account_id)
