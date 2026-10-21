@@ -12,7 +12,7 @@ from app.core.deps import get_current_active_user, require_permission
 from app.database import get_db
 from app.models import GeneratedAd, User
 from app.delivery.api import DeliveryRoute, page, problem
-from app.creatives.analysis import analyze_media, MODEL
+from app.creatives.analysis import analyze_media, failure_message, MODEL
 from app.creatives.models import CreativeAsset, CreativeEvent
 from app.creatives.schemas import CreativeMetadata, MetadataEdit
 from app.creatives.service import event, lock_asset, register_generated, now
@@ -227,7 +227,7 @@ def analyze(
     except Exception as error:
         capture_exception(error, "creatives.analyze")
         asset.analysis_status = "failed"
-        asset.analysis_error = "Analysis failed. Retry analysis; an admin can check the Gemini configuration."
+        asset.analysis_error = failure_message(error)
         event(db, asset, user.id, "analysis_failed")
         db.commit()
         problem(502, "ANALYSIS_FAILED", asset.analysis_error)

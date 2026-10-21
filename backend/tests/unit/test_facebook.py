@@ -172,6 +172,30 @@ class TestFacebookLocations:
             status.HTTP_500_INTERNAL_SERVER_ERROR
         ]
 
+    def test_search_uses_graph_location_search_not_interest_search(self, monkeypatch):
+        """Locations come from GET /search?type=adgeolocation; the account's
+        /targetingsearch edge only returns interests and behaviors."""
+        import json
+        import requests
+        from unittest.mock import Mock
+        from facebook_business.api import FacebookAdsApi
+        from facebook_business.session import FacebookSession
+        from app.delivery.config import GRAPH_VERSION
+        from app.services.facebook_service import FacebookService
+
+        region = {"key": "3843", "name": "California", "type": "region", "country_code": "US"}
+        send = Mock(return_value=Mock(status_code=200, headers={}, text=json.dumps({"data": [region]})))
+        monkeypatch.setattr(requests.Session, "request", send)
+        service = FacebookService.__new__(FacebookService)
+        service.api = FacebookAdsApi(FacebookSession(access_token="test-token"), api_version=GRAPH_VERSION)
+        service.account = None
+
+        assert service.search_locations("Calif", "country,region", 10, "act_123") == [region]
+        assert send.call_args.args == ("GET", f"https://graph.facebook.com/{GRAPH_VERSION}/search")
+        params = send.call_args.kwargs["params"]
+        assert params["type"] == "adgeolocation" and params["q"] == "Calif"
+        assert json.loads(params["location_types"]) == ["country", "region"]
+
 
 class TestFacebookServiceMocked:
     """Tests with mocked Facebook service."""

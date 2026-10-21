@@ -538,8 +538,13 @@ class FacebookService:
         }
 
     def search_locations(self, query, location_type='city', limit=10, ad_account_id=None):
-        """Search for targeting locations."""
-        account = self._get_account(ad_account_id)
+        """Search Meta's location catalog (GET /search?type=adgeolocation).
+
+        The ad account's /targetingsearch edge only covers interests, behaviors
+        and demographics, so it never returns countries, regions or cities.
+        """
+        # Initializes the API and scopes the request budget to the ad account.
+        self._get_account(ad_account_id)
 
         params = {
             'q': query,
@@ -548,7 +553,7 @@ class FacebookService:
             'limit': limit,
         }
 
-        return account.get_targeting_search(params=params)
+        return self.api.call('GET', ('search',), params).json().get('data', [])
 
 
 

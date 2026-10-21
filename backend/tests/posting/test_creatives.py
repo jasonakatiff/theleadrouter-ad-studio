@@ -404,6 +404,115 @@ def test_analysis_sends_real_media_and_cleans_up_provider_video(
         assert calls[-1].method == "DELETE"
 
 
+def analyze_image_with(monkeypatch, tmp_path, responses):
+    """Run image analysis against a scripted sequence of Gemini responses."""
+    import httpx
+    from contextlib import contextmanager
+    from app.creatives import analysis
+
+    path = tmp_path / "test.png"
+    path.write_bytes(b"test-original-media")
+
+    @contextmanager
+    def download(url, video=False):
+        yield str(path)
+
+    monkeypatch.setattr(analysis, "download_media", download)
+    monkeypatch.setattr(analysis, "require_provider_key", lambda provider: "test-analysis-key")
+    monkeypatch.setattr(analysis, "RETRY_SECONDS", 0)
+    calls = []
+
+    def handle(request):
+        calls.append(request)
+        return responses.pop(0)
+
+    client = httpx.Client(transport=httpx.MockTransport(handle))
+    monkeypatch.setattr(analysis.httpx, "Client", lambda **kwargs: client)
+    return analysis.analyze_media("https://example.com/test.png", "image"), calls
+
+
+def gemini_json(values):
+    import httpx
+    import json
+
+    return httpx.Response(
+        200, json={"candidates": [{"content": {"parts": [{"text": json.dumps(values)}]}}]}
+    )
+
+
+def test_analysis_fits_verbose_empty_and_unknown_labels_to_the_schema(monkeypatch, tmp_path):
+    result, _ = analyze_image_with(
+        monkeypatch,
+        tmp_path,
+        [gemini_json({"talent_type": "influencer", "background": "", "lighting": "soft", "messaging_angle": "x" * 900})],
+    )
+    assert result["talent_type"] == "unknown"
+    assert result["background"] == "unknown"
+    assert result["lighting"] == "soft"
+    assert len(result["messaging_angle"]) == 500
+
+
+def test_analysis_retries_a_transient_provider_failure(monkeypatch, tmp_path):
+    import httpx
+
+    result, calls = analyze_image_with(
+        monkeypatch, tmp_path, [httpx.Response(503, json={}), gemini_json({"lighting": "soft"})]
+    )
+    assert result["lighting"] == "soft" and len(calls) == 2
+
+
+@pytest.mark.parametrize(
+    "responses,expected,settings",
+    [
+        ([{"promptFeedback": {"blockReason": "SAFETY"}}], "declined to analyze this creative (SAFETY)", False),
+        ([{"candidates": [{"finishReason": "IMAGE_SAFETY"}]}], "(IMAGE_SAFETY)", False),
+        ([(400, {"error": {"message": "Unsupported MIME type: image/gif"}})], "Unsupported MIME type: image/gif", False),
+        ([(429, {}), (429, {})], "rate-limiting", False),
+        ([(400, {"error": {"message": "API key not valid.", "details": [{"reason": "API_KEY_INVALID"}]}})], "Settings → Integrations", True),
+        ([(403, {"error": {"message": "Permission denied"}})], "Settings → Integrations", True),
+    ],
+)
+def test_analysis_failures_name_their_cause(monkeypatch, tmp_path, responses, expected, settings):
+    import httpx
+    from app.creatives.analysis import AnalysisError, failure_message
+
+    scripted = [
+        httpx.Response(item[0], json=item[1]) if isinstance(item, tuple) else httpx.Response(200, json=item)
+        for item in responses
+    ]
+    with pytest.raises(AnalysisError) as failure:
+        analyze_image_with(monkeypatch, tmp_path, scripted)
+    message = failure_message(failure.value)
+    assert expected in message
+    assert ("Settings" in message) is settings
+    assert "test-analysis-key" not in message
+
+
+def test_analysis_error_reaches_the_creative_without_blaming_settings(creative_api, monkeypatch):
+    from app.creatives import api
+    from app.creatives.analysis import AnalysisError
+
+    client, _ = creative_api
+    asset = upload(client)
+
+    def blocked(*args):
+        raise AnalysisError("Gemini declined to analyze this creative (SAFETY).")
+
+    monkeypatch.setattr(api, "analyze_media", blocked)
+    failure = client.post(f'/api/v1/creatives/{asset["id"]}/analyze')
+    assert failure.status_code == 502
+    stored = client.get(f'/api/v1/creatives/{asset["id"]}').json()["analysis_error"]
+    assert stored == "Gemini declined to analyze this creative (SAFETY)."
+
+    def crashed(*args):
+        raise RuntimeError("test-provider-secret-must-not-leak")
+
+    monkeypatch.setattr(api, "analyze_media", crashed)
+    client.post(f'/api/v1/creatives/{asset["id"]}/analyze')
+    stored = client.get(f'/api/v1/creatives/{asset["id"]}').json()["analysis_error"]
+    assert stored == "Analysis failed unexpectedly. Retry analysis."
+
+
 def test_reusing_another_creators_asset_keeps_both_users_and_report_link(
     creative_api, sessions, buyer
 ):

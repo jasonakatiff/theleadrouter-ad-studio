@@ -1,6 +1,25 @@
 # Changelog
 
-## Instagram page identity default and honest Gemini analysis errors — 2026-09-10
+## Creative analysis causes and ad set location search — 2026-09-10
+
+Creative library analysis (required before launch) no longer reports every
+failure as "an admin can check the Gemini configuration". Empty, overlong or
+out-of-enum model labels are fitted to the metadata schema instead of failing
+the creative; safety blocks, rejected media, rate limits, timeouts and media
+download problems name their cause; a transient 429/5xx retries once; only key
+problems (401/403, invalid key) point at Settings → Integrations (issue #58).
+
+Ad set location search now queries Meta's location catalog
+(`/search?type=adgeolocation`). It called the ad account's `/targetingsearch`
+edge, which returns interests and behaviors only, so countries, states and
+cities could not be added or excluded (issues #8, #27).
+
+Tests: backend 643 passed, 1 xpassed on isolated local PostgreSQL (10 new,
+each failing before the fix); no frontend changes. Provider responses are
+simulated in tests; live Gemini and Meta behavior is unverified until the media
+team retests on the deployed build.
+
+## Instagram page identity default and honest Gemini errors — 2026-09-10
 
 Ads no longer require a linked Instagram account when Instagram placements are on:
 the creative step defaults to "Use Facebook Page (default)", the wizard and the
@@ -8,12 +27,13 @@ publish preflight accept the page identity, and the creative sets
 `use_page_actor_override` so Meta runs Instagram placements under the Page
 (issue #19).
 
-Creative analysis failures now report their real cause instead of pointing every
-failure at Settings → Integrations: provider safety blocks and rejected requests
-surface per-creative messages, rate limits retry once and then say to wait, and
-only key-level failures (401/403/402) change the stored connection status
-(issue #58).
+Copy generation and Ad Remix Gemini failures now report their real cause instead
+of pointing every failure at Settings → Integrations: provider safety blocks and
+rejected requests surface specific messages, rate limits retry once and then say
+to wait, and only key-level failures (401/403/402) change the stored connection
+status. (Creative library analysis uses a separate client; see the entry above.)
 
+[PR #59](https://github.com/jasonakatiff/theleadrouter-ad-studio/pull/59).
 Tests: 12 backend unit tests passed (6 new for the provider boundary), 98
 frontend unit tests and the frontend build passed locally.
 

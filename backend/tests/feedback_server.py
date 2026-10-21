@@ -64,7 +64,7 @@ def meta_transport(self, method, path, params=None, **kwargs):
                 {"id": "445", "name": "test-Customers", "subtype": "CUSTOM"},
             ]
         }
-    elif edge == "targetingsearch":
+    elif edge == "search" and params.get("type") == "adgeolocation":
         result = {
             "data": [
                 {
