@@ -51,7 +51,7 @@
     "globals": "^16.5.0",
     "jsdom": "^24.0.0",
     "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1",
+    "tailwindcss": "^4.3.3",
     "vite": "^7.2.2",
     "vitest": "^3.2.7",
     "@playwright/test": "^1.57.0"
