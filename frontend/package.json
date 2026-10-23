@@ -32,7 +32,7 @@
     "lucide-react": "^0.554.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
-    "react-router-dom": "^7.9.6",
+    "react-router-dom": "^7.18.3",
     "recharts": "^2.15.0"
   },
   "devDependencies": {
