@@ -131,3 +131,31 @@ def test_a_github_failure_backs_off_and_never_escapes_to_the_worker(db_session, 
     assert db_session.get(FeedbackSubmission, row.id).status == "sent"
     db_session.delete(db_session.get(FeedbackSubmission, row.id))
     db_session.commit()
+
+
+def test_a_pass_stops_at_the_first_failure_and_commits_one_row_at_a_time(
+    db_session, configured
+):
+    """Rows are claimed singly: committing a batch would release the locks still
+    held on the rest of it, so an overlapping worker could send them twice. And a
+    provider that hangs must not delay the worker's heartbeat by a whole batch."""
+    from app.services import feedback_mirror
+
+    first = submit(db_session, "test-batch row one")
+    second = submit(db_session, "test-batch row two")
+    attempted = []
+
+    def failing(title, body):
+        attempted.append(body)
+        raise RuntimeError("test-provider down")
+
+    assert feedback_mirror.mirror_pending(db_session, post=failing) == 0
+    assert len(attempted) == 1, "the pass must stop at the first provider failure"
+    untouched = [r for r in (first, second) if db_session.get(FeedbackSubmission, r.id).attempts == 0]
+    assert len(untouched) == 1, "only the attempted row should carry an attempt"
+
+    for row in (first, second):
+        stored = db_session.get(FeedbackSubmission, row.id)
+        stored.next_attempt_at = None
+        db_session.delete(stored)
+    db_session.commit()

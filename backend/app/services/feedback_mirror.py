@@ -140,19 +140,30 @@ def claim_pending(db, limit):
 
 
 def mirror_pending(db, post=None):
-    """Send pending feedback. Returns how many drafts were created."""
+    """Send pending feedback. Returns how many drafts were created.
+
+    One row per transaction: committing a batch would release the locks still held
+    on the rest of it, letting an overlapping worker send them a second time. The
+    pass stops at the first provider failure — if the provider is down for one row
+    it is down for all of them, and five sequential timeouts would delay the
+    worker's heartbeat past its maximum age.
+    """
     if not mirror_enabled():
         return 0
     send = post or post_draft
     sent = 0
-    for row in claim_pending(db, FEEDBACK_MIRROR_BATCH):
+    for _ in range(FEEDBACK_MIRROR_BATCH):
+        claimed = claim_pending(db, 1)
+        if not claimed:
+            break
+        row = claimed[0]
         submitter = None
         if row.user_id:
             user = db.get(User, row.user_id)
             submitter = (user.name or user.email) if user else None
         try:
             ticket_id = send(draft_title(row.category, row.page), draft_body(row, submitter))
-        except Exception as error:  # one bad submission must not stall the rest
+        except Exception as error:  # provider trouble: record it and end the pass
             row.attempts += 1
             row.last_error = str(error)[:500]
             row.next_attempt_at = datetime.now(timezone.utc) + timedelta(
@@ -164,7 +175,7 @@ def mirror_pending(db, post=None):
             logging.getLogger(__name__).warning(
                 "Feedback mirror attempt %s failed for %s", row.attempts, row.id
             )
-            continue
+            break
         row.status, row.ticket_id = "sent", str(ticket_id)
         row.sent_at, row.last_error, row.next_attempt_at = (
             datetime.now(timezone.utc),

@@ -55,17 +55,19 @@ def upgrade():
             (id, created_at, event_id, user_id, category, page, message, trace_id, status, attempts)
         SELECT
             gen_random_uuid()::text,
-            created_at,
-            id,
-            user_id,
-            COALESCE(attributes->>'category', 'bug'),
-            LEFT(attributes->>'page', 500),
-            message,
-            trace_id,
+            te.created_at,
+            te.id,
+            u.id,
+            COALESCE(te.attributes->>'category', 'bug'),
+            LEFT(te.attributes->>'page', 500),
+            te.message,
+            te.trace_id,
             'pending',
             0
-        FROM telemetry_events
-        WHERE kind = 'feedback' AND message IS NOT NULL
+        FROM telemetry_events te
+        -- the author may have been deleted since; keep the feedback, drop the link
+        LEFT JOIN users u ON u.id = te.user_id
+        WHERE te.kind = 'feedback' AND te.message IS NOT NULL
         ON CONFLICT (event_id) DO NOTHING
         """
     )

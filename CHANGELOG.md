@@ -18,9 +18,9 @@ than any backtick run it contains, and the title is built only from the category
 sanitised page path. Both settings (`GITHUB_FEEDBACK_TOKEN`, `GITHUB_FEEDBACK_PROJECT_ID`)
 are optional and unset by default; without them feedback is still stored, just not mirrored.
 
-Tests: 648 backend passed, 1 xpassed on isolated local PostgreSQL, including five new
-tests covering durable storage, the disabled default, idempotency, fence escaping and
-back-off on provider failure. The migration and its backfill were run against a
+Tests: 649 backend passed, 1 xpassed on isolated local PostgreSQL, including six new
+tests covering durable storage, the disabled default, idempotency, fence escaping,
+back-off on provider failure, and single-row claiming. The migration and its backfill were run against a
 prod-shaped database, and the real GitHub client was exercised once against a live board.
 
 ## Creative analysis causes and ad set location search — 2026-09-10
