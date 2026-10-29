@@ -37,6 +37,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 ads = {}
+creatives = {}
 serial = 910000
 reports = {}
 
@@ -61,7 +62,11 @@ class FakeProvider:
         return ["https://example.com/test-thumbnail.jpg"]
 
     def create_creative(self, data, account_id):
-        return {"id": "913456"}
+        global serial
+        serial += 1
+        identity = str(serial)
+        creatives[identity] = {"id": identity, "name": data["name"]}
+        return {"id": identity}
 
     def create_ad(self, data, account_id):
         global serial
@@ -83,7 +88,9 @@ class FakeProvider:
             "name": data["name"],
             "account_id": account_id.removeprefix("act_"),
             "adset_id": data["adset_id"],
-            "creative": {"id": data["creative_id"]},
+            "creative": creatives.get(
+                data["creative_id"], {"id": data["creative_id"], "name": ""}
+            ),
             "effective_status": "PAUSED",
         }
         if data["name"].startswith("test-timeout"):

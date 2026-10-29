@@ -126,7 +126,7 @@ class DeliveryProvider(FacebookService):
         import time
 
         deadline = time.monotonic() + 120
-        params = {"fields": "id,name,account_id,adset_id,creative{id}", "limit": 100}
+        params = {"fields": "id,name,account_id,adset_id,creative{id,name}", "limit": 100}
         seen, matches = set(), []
         for _ in range(20):
             if time.monotonic() >= deadline:
@@ -254,7 +254,7 @@ class DeliveryProvider(FacebookService):
         return self.read(
             ad_id,
             {
-                "fields": "id,name,account_id,adset_id,campaign_id,effective_status,creative{id}"
+                "fields": "id,name,account_id,adset_id,campaign_id,effective_status,creative{id,name}"
             },
         )
 
@@ -305,6 +305,15 @@ class DeliveryProvider(FacebookService):
         return data["data"], after if more else None
 
 
+def job_marker(job):
+    """The launch marker used to recognise a job's own objects on Meta.
+
+    It lives on the creative name, never the ad name: ad names are reported as
+    ad_name and feed buyers' tracking, so they must stay exactly what was typed.
+    """
+    return job.name + " [bw:" + job.id + "]"
+
+
 def matches_job(job, remote):
     creative = job.results.get("creative_id") or job.payload.get("creative_id")
     return (
@@ -312,5 +321,5 @@ def matches_job(job, remote):
         == job.account_id.removeprefix("act_")
         and str(remote.get("adset_id")) == job.payload["adset_id"]
         and str(remote.get("creative", {}).get("id")) == creative
-        and remote.get("name") == job.name + " [bw:" + job.id + "]"
+        and remote.get("creative", {}).get("name") == job_marker(job)
     )

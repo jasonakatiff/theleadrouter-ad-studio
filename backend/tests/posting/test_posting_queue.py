@@ -305,3 +305,41 @@ def test_interrupted_video_read_consumes_retry_budget(sessions, engine, buyer):
     provider.video_status.assert_not_called()
     with sessions() as db:
         assert db.query(DeliveryJob).one().status == "failed"
+
+
+def test_ad_name_stays_clean_and_the_launch_marker_moves_to_the_creative(
+    sessions, engine, buyer
+):
+    """Ad names are reported as ad_name and feed buyers' tracking, so the
+    [bw:<job>] launch marker belongs on the creative, which is never reported."""
+    from app.delivery.provider import job_marker, matches_job
+
+    payload = {**PAYLOAD, "name": "WC_Q4_Solar_v3"}
+    with sessions() as db:
+        job = enqueue(db, buyer.id, "test-wc-key", "act_789", "ad", payload)
+        job_id, marker = job.id, job_marker(job)
+    provider = Mock()
+    provider.create_creative.return_value = {"id": "456"}
+    provider.create_ad.return_value = {"id": "987"}
+    posting_tick(engine, lambda: provider)
+
+    sent = provider.create_ad.call_args.args[0]["name"]
+    assert sent == "WC_Q4_Solar_v3", "the ad name must be exactly what the buyer typed"
+    assert "[bw:" not in sent
+    assert marker == "WC_Q4_Solar_v3 [bw:" + job_id + "]"
+
+    with sessions() as db:
+        job = db.get(DeliveryJob, job_id)
+        remote = {
+            "id": "987",
+            "name": "WC_Q4_Solar_v3",
+            "account_id": "789",
+            "adset_id": "123",
+            "creative": {"id": "456", "name": marker},
+        }
+        # recovery still identifies the job despite the clean ad name
+        assert matches_job(job, remote)
+        assert not matches_job(
+            job, {**remote, "creative": {"id": "456", "name": "another job's creative"}}
+        )
+        assert not matches_job(job, {**remote, "creative": {"id": "999", "name": marker}})
