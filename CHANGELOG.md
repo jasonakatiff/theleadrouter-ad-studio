@@ -23,6 +23,24 @@ tests covering durable storage, the disabled default, idempotency, fence escapin
 back-off on provider failure, and single-row claiming. The migration and its backfill were run against a
 prod-shaped database, and the real GitHub client was exercised once against a live board.
 
+## Ad names keep the buyer's exact text — 2026-10-23
+
+Published ads were named `<ad name> [bw:<job id>]`. That suffix is the launch
+marker the posting queue uses to recognise its own objects on Meta after an
+interrupted write, but it reached Ads Manager and broke `ad_name` tracking for
+buyers (reported from a web-conversion launch on 2026-10-23).
+
+The marker moves to the **creative** name, which Meta never reports at ad level;
+the ad is created with exactly the name that was typed. Reconciliation still
+identifies a job by account, ad set, creative id and that marker, now read from
+`creative{id,name}`. Jobs created before this change are unaffected, because the
+creative name has always carried the marker too.
+
+Tests: 644 backend passed, 1 xpassed on isolated local PostgreSQL, including a
+new regression test asserting the ad name is sent verbatim and that
+reconciliation still matches on the creative marker alone.
+
+
 ## Creative analysis causes and ad set location search — 2026-09-10
 
 Creative library analysis (required before launch) no longer reports every

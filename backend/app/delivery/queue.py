@@ -18,7 +18,7 @@ from app.delivery.models import (
 )
 from app.delivery.errors import classify_write_error
 from app.delivery.recovery import notify_failure
-from app.delivery.provider import DeliveryProvider, ProviderError
+from app.delivery.provider import DeliveryProvider, ProviderError, job_marker
 from app.delivery.budget import RequestDeferred
 from app.models import FacebookAd, User
 
@@ -497,7 +497,7 @@ def posting_tick(engine, provider_factory=None):
                     db.commit()
             elif job.stage == "creative":
                 creative = provider.create_creative(
-                    {**p, **job.results, "name": job.name + " [bw:" + job.id + "]"},
+                    {**p, **job.results, "name": job_marker(job)},
                     job.account_id,
                 )
                 advance(db, job, "ad", {"creative_id": str(creative["id"])})
@@ -507,7 +507,7 @@ def posting_tick(engine, provider_factory=None):
                         **p,
                         "creative_id": job.results.get("creative_id")
                         or p["creative_id"],
-                        "name": job.name + " [bw:" + job.id + "]",
+                        "name": job.name,
                     },
                     job.account_id,
                 )
