@@ -1,5 +1,28 @@
 # Changelog
 
+## In-app feedback becomes durable and reaches the project board — 2026-10-29
+
+Feedback submitted in the app was written only as a telemetry event, so it inherited
+telemetry's retention: deleted after 14 days, and sooner when volume pruning removed the
+oldest rows. Nobody was notified, and the only way to read it was the admin Telemetry
+page. The one surviving submission would have been deleted around 2026-11-11.
+
+Each submission is now copied into `feedback_submissions` in the same transaction as its
+telemetry event, so feedback stops expiring on every install regardless of configuration.
+The migration backfills feedback already in telemetry.
+
+The sync worker then drains pending rows into **draft items on a private project board**,
+chosen over public issues because feedback is untrusted free text that routinely carries
+client account and campaign identifiers. The message is quoted inside a fence sized longer
+than any backtick run it contains, and the title is built only from the category and the
+sanitised page path. Both settings (`GITHUB_FEEDBACK_TOKEN`, `GITHUB_FEEDBACK_PROJECT_ID`)
+are optional and unset by default; without them feedback is still stored, just not mirrored.
+
+Tests: 648 backend passed, 1 xpassed on isolated local PostgreSQL, including five new
+tests covering durable storage, the disabled default, idempotency, fence escaping and
+back-off on provider failure. The migration and its backfill were run against a
+prod-shaped database, and the real GitHub client was exercised once against a live board.
+
 ## Creative analysis causes and ad set location search — 2026-09-10
 
 Creative library analysis (required before launch) no longer reports every

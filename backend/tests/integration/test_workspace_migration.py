@@ -127,7 +127,7 @@ def test_alembic_upgrades_old_schema_and_repeating_head_is_safe():
             tables=[
                 table
                 for table in Base.metadata.sorted_tables
-                if not table.name.startswith("analytics_") and table.name not in TABLES | {"installation_state", "provider_connections", "telemetry_events", "plugin_installations", "plugin_runs", "delivery_settings", "delivery_jobs", "managed_ads", "delivery_syncs", "ad_insights", "creative_assets", "creative_events", "delivery_api_requests", "delivery_api_cooldowns", "delivery_provider_cache", "delivery_staged_insights", "delivery_post_attempts", "delivery_notifications"}
+                if not table.name.startswith("analytics_") and table.name not in TABLES | {"installation_state", "provider_connections", "telemetry_events", "plugin_installations", "plugin_runs", "delivery_settings", "delivery_jobs", "managed_ads", "delivery_syncs", "ad_insights", "creative_assets", "creative_events", "delivery_api_requests", "delivery_api_cooldowns", "delivery_provider_cache", "delivery_staged_insights", "delivery_post_attempts", "delivery_notifications", "feedback_submissions"}
             ],
         )
         with scoped.begin() as db:
@@ -162,7 +162,7 @@ def test_alembic_upgrades_old_schema_and_repeating_head_is_safe():
         with scoped.connect() as db:
             assert (
                 db.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-                == "public_cutover_20260912"
+                == "feedback_mirror_20261029"
             )
             assert (
                 db.execute(text("SELECT name FROM brands")).scalar_one()

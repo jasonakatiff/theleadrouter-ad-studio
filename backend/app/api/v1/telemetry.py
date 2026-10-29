@@ -23,6 +23,7 @@ from app.core.config import settings
 from app.core.deps import get_current_user, get_browser_user
 from app.database import get_db
 from app.models import TelemetryEvent, User
+from app.services.feedback_mirror import record_submission
 from app.telemetry import config
 from app.telemetry.runtime import collector, emit, make_event, sanitize, trace_context
 
@@ -526,6 +527,16 @@ def feedback(
     )
     # Feedback is acknowledged only after durable storage, independently of the queue.
     db.add(TelemetryEvent(**record))
+    # Telemetry is pruned by age and volume; product feedback must outlive it.
+    record_submission(
+        db,
+        event_id=record["id"],
+        user_id=user.id,
+        category=body.category,
+        page=safe_page(body.page),
+        message=body.message,
+        trace_id=record["trace_id"],
+    )
     db.commit()
     return {
         "id": record["id"],

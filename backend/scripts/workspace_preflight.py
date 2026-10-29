@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
-EXPECTED_REVISION = "public_cutover_20260912"
+EXPECTED_REVISION = "feedback_mirror_20261029"
 REQUIRED_TABLES = frozenset(
     {
         "users",

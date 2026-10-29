@@ -17,11 +17,12 @@ def test_public_cutover_joins_both_released_migration_histories():
     config = Config(str(backend / "alembic.ini"))
     config.set_main_option("script_location", str(backend / "alembic"))
     scripts = ScriptDirectory.from_config(config)
-    assert scripts.get_heads() == ["public_cutover_20260912"]
+    assert scripts.get_heads() == ["feedback_mirror_20261029"]
     ancestors = {revision.revision for revision in scripts.walk_revisions()}
     assert {"analytics_20260911", "bw_install_001"} <= ancestors
-    head = scripts.get_revision("head")
-    assert set(head.down_revision) == {"analytics_20260911", "bw_install_001"}
+    # The cutover merge is no longer the head, but it must still join both histories.
+    cutover = scripts.get_revision("public_cutover_20260912")
+    assert set(cutover.down_revision) == {"analytics_20260911", "bw_install_001"}
 
 
 @pytest.mark.parametrize("baseline,revision", [("installer", "bw_install_001"), ("hosted", "analytics_20260911")])
@@ -55,7 +56,7 @@ def test_released_schema_upgrade_preserves_existing_records(baseline, revision):
         )
         assert result.returncode == 0, result.stderr
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "public_cutover_20260912"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "feedback_mirror_20261029"
         assert connection.execute(text("SELECT id,hashed_password FROM users")).one() == ("test-owner", "test-preserved-password-hash")
         assert connection.execute(text("SELECT image_url FROM generated_ads WHERE id='test-ad'")).scalar_one() == "https://media.example.com/test-original.png"
         assert connection.execute(text("SELECT encrypted_refresh_token FROM google_ads_connections WHERE id='test-google'")).scalar_one() == "test-preserved-ciphertext"
