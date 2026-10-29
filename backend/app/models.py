@@ -928,3 +928,31 @@ class ProviderConnection(Base):
         CheckConstraint("provider IN ('gemini','fal','kie')", name="ck_provider_name"),
         CheckConstraint("status IN ('not_configured','saved_unverified','connected','invalid','insufficient_credit','temporarily_unavailable')", name="ck_provider_status"),
     )
+
+
+class FeedbackSubmission(Base):
+    """A durable copy of in-app feedback, mirrored to a private project board.
+
+    Telemetry events are pruned by age and volume; product feedback must not be,
+    so the submission is stored here in the same transaction as its telemetry row.
+    """
+
+    __tablename__ = "feedback_submissions"
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    event_id = Column(String(36), unique=True)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+    category = Column(String(16), nullable=False, server_default="bug")
+    page = Column(String(500))
+    message = Column(Text, nullable=False)
+    trace_id = Column(String(32))
+    status = Column(String(16), nullable=False, server_default="pending")
+    attempts = Column(Integer, nullable=False, server_default="0")
+    next_attempt_at = Column(DateTime(timezone=True))
+    last_error = Column(Text)
+    ticket_id = Column(String(64))
+    sent_at = Column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint("status IN ('pending','sent','failed')", name="ck_feedback_status"),
+        Index("ix_feedback_submissions_pending", "status", "next_attempt_at"),
+    )
